@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "microsoft_learning_nt",
+  "project_id": "562fd508-42f6-4843-8ecf-973477e593a9"
+}
