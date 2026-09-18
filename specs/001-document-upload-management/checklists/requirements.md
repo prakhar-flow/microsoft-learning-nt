@@ -49,22 +49,27 @@ stakeholder requirements before technical planning begins.
 
 ## Ambiguities requiring clarification
 
-These are recorded deliberately and are the input to the clarification step. The spec is not
-ready for planning until each is resolved.
+All resolved in the clarification session of 2026-09-18; see the Clarifications section of
+`spec.md` for each question, its answer, and the rationale.
 
-- [ ] CHK031 Fate of project documents when their uploader is removed from the project
-- [ ] CHK032 Fate of documents when their associated project is deleted
-- [ ] CHK033 Effect on recipients when an owner deletes a shared document
-- [ ] CHK034 Handling of special characters and non-Latin script in original filenames
-- [ ] CHK035 System behavior when storage is exhausted mid-upload
-- [ ] CHK036 What satisfies the malware-scanning requirement in a build forbidden from using external services — a direct conflict between the stakeholder document's security requirements and its technical constraints
-- [ ] CHK037 Meaning of sharing with a "team" when the application models departments and project memberships but has no team entity
-- [ ] CHK038 Limits on tag count and tag length
+- [x] CHK031 Fate of project documents when their uploader is removed from the project
+- [x] CHK032 Fate of documents when their associated project is deleted
+- [x] CHK033 Effect on recipients when an owner deletes a shared document
+- [x] CHK034 Handling of special characters and non-Latin script in original filenames
+- [x] CHK035 System behavior when storage is exhausted mid-upload
+- [x] CHK036 What satisfies the malware-scanning requirement in a build forbidden from using external services — a direct conflict between the stakeholder document's security requirements and its technical constraints
+- [x] CHK037 Meaning of sharing with a "team" when the application models departments and project memberships but has no team entity
+- [x] CHK038 Limits on tag count and tag length
+
+## Status
+
+All items pass. No open issues. The specification is ready for technical planning.
 
 ## Notes
 
-- CHK036 is the most consequential open item: the stakeholder document mandates virus and
-  malware scanning before storage while simultaneously forbidding cloud services and external
-  dependencies. It cannot be satisfied as literally written and needs an explicit decision.
-- CHK031 through CHK033 each imply data-retention behavior that will shape the data model, so
-  they should be resolved before the plan fixes entity relationships.
+- CHK036 was the most consequential item and was resolved by accepting a documented
+  limitation rather than a fiction: extension, MIME, and leading-byte validation stand in for
+  anti-malware scanning, behind an abstraction that a real engine can replace. The spec states
+  plainly that this is not equivalent to scanning.
+- CHK031 through CHK033 were resolved toward retention over cascade deletion, since the
+  feature has no trash or recovery mechanism and silent data loss is the worse failure.

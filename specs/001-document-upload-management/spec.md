@@ -5,6 +5,73 @@
 **Status**: Draft
 **Input**: `StakeholderDocs/document-upload-and-management-feature.md` — Contoso Corporation's requirements for adding document upload and management capabilities to ContosoDashboard.
 
+## Clarifications
+
+### Session 2026-09-18
+
+Eight ambiguities recorded in the initial draft were resolved as follows. Each answer is
+reflected in the requirements and edge cases below.
+
+- **Q: When a user is removed from a project after uploading documents to it, what happens to those documents?**
+  **A:** The documents remain associated with the project and stay available to current
+  project members. The removed user keeps uploader rights over their own documents — they
+  continue to appear in that user's "My Documents" and remain editable and deletable by
+  them — but the user loses the project-membership route to documents uploaded by others.
+  Rationale: project documents are project assets; revoking access to them on a team change
+  would destroy project continuity, while stripping uploaders of their own documents would
+  be surprising.
+
+- **Q: When a project is deleted, what happens to its documents?**
+  **A:** The documents are retained and disassociated from the project, reverting to the
+  uploader's personal documents with their category preserved. They are not deleted.
+  Rationale: deleting a project is an organizational act; silently destroying uploaded
+  content as a side effect risks irrecoverable data loss, and this feature has no trash or
+  recovery mechanism.
+
+- **Q: When an owner deletes a document that has been shared, what happens to recipients?**
+  **A:** Deletion proceeds, all shares are removed with it, and each recipient receives an
+  in-app notification that the document was deleted by its owner. Recipients cannot block
+  the deletion. Rationale: the stakeholder document specifies permanent deletion on owner
+  confirmation; silently removing a document from a recipient's view is the failure mode
+  worth avoiding, and a notification is enough to avoid it.
+
+- **Q: How are filenames containing special characters, non-Latin script, or path separators handled?**
+  **A:** The original filename is preserved verbatim as display metadata and reused as the
+  filename when the document is downloaded, after being sanitized for safe transport. It
+  never influences the storage path, which is always derived from a generated identifier.
+  Filenames longer than 255 characters are rejected. Rationale: users identify documents by
+  the names they gave them; separating display name from storage path removes the security
+  concern without degrading usability.
+
+- **Q: How does the system respond when storage is exhausted mid-upload?**
+  **A:** The upload fails, the partially written file is deleted, no metadata record is
+  created, and the user sees an error stating the document could not be stored and should be
+  retried. The underlying condition is logged for administrators. Rationale: this is the
+  general failure path already required for orphan prevention; storage exhaustion is one
+  cause among several and should not have a bespoke outcome.
+
+- **Q: The stakeholder document requires malware scanning before storage, but forbids cloud services and external dependencies. What satisfies this requirement?**
+  **A:** For this build, content validation consists of server-side extension whitelisting,
+  MIME type validation, and verification that the file's leading bytes match the declared
+  type. This is performed behind a scanning abstraction so that a real anti-malware engine
+  can be substituted without changes to the upload workflow. **This is explicitly not
+  equivalent to anti-malware scanning and is recorded as a known limitation of a training
+  build that must run offline.** Rationale: the two stakeholder requirements cannot both be
+  met literally; preserving the seam where real scanning belongs is more honest than either
+  claiming to scan or dropping the requirement silently.
+
+- **Q: The stakeholder document mentions sharing with "teams", but the application has no team entity. What does sharing target?**
+  **A:** Sharing targets individually named users only. Project association already provides
+  shared access for a project's members, which covers the collaboration case. Department-wide
+  and team-wide sharing are out of scope for this release. Rationale: inventing a team entity
+  would be a larger change than the feature warrants, and the existing project mechanism
+  already satisfies the underlying need.
+
+- **Q: Are there limits on tags?**
+  **A:** A document may carry at most 10 tags, each at most 50 characters. Tags are matched
+  case-insensitively and duplicates within a document are collapsed. Rationale: bounds are
+  needed to keep search predictable and to prevent unbounded metadata growth.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Upload a document with metadata (Priority: P1)
@@ -185,18 +252,18 @@ produced an activity record, and that an Administrator can view reports aggregat
 
 ### Edge Cases
 
-- **Uploader leaves a project**: A user uploads documents to a project and is later removed from the project team. [NEEDS CLARIFICATION: Do those documents remain with the project, revert to the uploader's personal documents, or become inaccessible to the former member?]
-- **Project deletion**: A project with associated documents is deleted. [NEEDS CLARIFICATION: Are its documents deleted, reassigned to the uploaders as personal documents, or left orphaned but retrievable by Administrators?]
-- **Owner deletes a shared document**: A document that has been shared with several recipients is deleted by its owner. [NEEDS CLARIFICATION: Do recipients silently lose access, receive a notification, or does deletion require the shares to be revoked first?]
-- **Awkward filenames**: A user uploads a file whose name contains special characters, non-Latin script, or path separators. [NEEDS CLARIFICATION: Is the original filename preserved for display and download, sanitized, or replaced?]
-- **Storage exhaustion**: Disk space runs out midway through writing an uploaded file. [NEEDS CLARIFICATION: What does the user see, and how is the partial file reclaimed?]
-- **Malware scanning offline**: The stakeholder document requires virus and malware scanning before storage, while the technical constraints forbid cloud services and external dependencies. [NEEDS CLARIFICATION: Is scanning satisfied by extension and content-type validation alone for the training build, deferred behind an interface, or genuinely required?]
-- **Sharing with a team**: The stakeholder document says documents may be shared with "specific users or teams", but the application has no team entity — only departments and project memberships. [NEEDS CLARIFICATION: Does "team" mean a department, a project's membership, or is it out of scope for this release?]
-- **Concurrent edits**: Two users with permission edit the same document's metadata simultaneously.
-- **Duplicate uploads**: The same file is uploaded twice by the same user.
-- **Empty or zero-byte file**: A user selects a file containing no data.
-- **Session expiry mid-upload**: The user's 8-hour authentication cookie expires while a large upload is in flight.
-- **Tag volume**: A user adds an unbounded number of tags, or a single tag of extreme length. [NEEDS CLARIFICATION: Are there limits on tag count and length?]
+- **Uploader leaves a project**: Documents remain with the project and remain visible to current project members. The former member retains uploader rights over their own documents but loses project-based access to documents uploaded by others.
+- **Project deletion**: Documents survive the project's deletion, are disassociated from it, and revert to the uploader's personal documents with category preserved.
+- **Owner deletes a shared document**: Deletion proceeds, every share is removed, and each recipient is notified in-app that the owner deleted the document.
+- **Awkward filenames**: The original filename is preserved for display and download and never reaches the storage path, which is derived from a generated identifier. Filenames over 255 characters are rejected.
+- **Storage exhaustion**: The upload fails, any partial file is removed, no metadata record is created, the user is told the document could not be stored and to retry, and the condition is logged.
+- **Content validation offline**: Extension whitelisting, MIME validation, and leading-byte verification stand in for anti-malware scanning, behind an abstraction that permits a real scanner to be substituted. Recorded as a known limitation.
+- **Sharing scope**: Shares name individual users. Project-wide access comes from project association; department- and team-wide sharing are out of scope.
+- **Concurrent edits**: Two users with permission edit the same document's metadata simultaneously; the later write wins and the earlier editor is not silently told their change was lost. [Accepted for this release — last-write-wins with no conflict detection.]
+- **Duplicate uploads**: The same file uploaded twice by the same user produces two independent documents. Deduplication is not attempted.
+- **Empty or zero-byte file**: Rejected at validation with an error, on the same path as a disallowed type.
+- **Session expiry mid-upload**: The upload fails and the user is returned to the login page; no partial document record survives.
+- **Tag volume**: At most 10 tags per document, each at most 50 characters; excess is rejected at validation.
 
 ## Requirements *(mandatory)*
 
@@ -210,13 +277,16 @@ produced an activity record, and that an Administrator can view reports aggregat
 - **FR-004**: System MUST validate file size and type on the server, independently of any client-side check.
 - **FR-005**: System MUST display upload progress and report success or failure explicitly on completion.
 - **FR-006**: System MUST require a title and a category for every uploaded document, and MUST accept an optional description, an optional associated project, and optional tags.
+- **FR-006a**: System MUST limit a document to at most 10 tags of at most 50 characters each, matching tags case-insensitively and collapsing duplicates within a document.
 - **FR-007**: System MUST restrict category values to: Project Documents, Team Resources, Personal Files, Reports, Presentations, Other.
 - **FR-008**: System MUST automatically record upload date and time, uploading user, file size, and MIME type for every document.
 - **FR-009**: System MUST accommodate MIME type values up to 255 characters.
 - **FR-010**: System MUST verify that a user is a member of a project before permitting a document to be associated with it.
 - **FR-011**: System MUST generate a unique storage path for each uploaded file before writing it, and MUST write the file to storage before creating its metadata record.
 - **FR-012**: System MUST remove a stored file if its metadata record cannot subsequently be created, leaving no orphaned files or records.
-- **FR-013**: System MUST scan or validate uploaded content before it is stored. [NEEDS CLARIFICATION: see "Malware scanning offline" edge case — what constitutes acceptable scanning in an offline build?]
+- **FR-013**: System MUST validate uploaded content before storing it by checking the file extension against the permitted list, checking the declared MIME type, and verifying that the file's leading bytes are consistent with the declared type.
+- **FR-013a**: System MUST perform that validation behind an abstraction that allows a real anti-malware scanner to be substituted without changing the upload workflow.
+- **FR-013b**: System MUST reject a zero-byte file.
 
 **Storage and security**
 
@@ -224,6 +294,9 @@ produced an activity record, and that an Administrator can view reports aggregat
 - **FR-015**: System MUST serve stored files only through an endpoint that performs an authorization check for the requesting user.
 - **FR-016**: System MUST derive stored filenames from generated identifiers rather than user-supplied filenames, so that no user input reaches a filesystem path.
 - **FR-017**: System MUST organize stored files by uploading user and by associated project or a personal equivalent.
+- **FR-017a**: System MUST preserve the original filename as display metadata and use it as the filename offered on download, while never allowing it to influence the storage path.
+- **FR-017b**: System MUST reject an original filename longer than 255 characters.
+- **FR-017c**: System MUST delete any partially written file and create no metadata record when storage fails during an upload, and MUST report the failure to the user as a retryable condition.
 - **FR-018**: System MUST access file storage through an abstraction that permits an alternative storage implementation to be substituted without changes to business logic, UI, or data schema.
 - **FR-019**: System MUST deny access to a document whose identifier is requested directly by a user without permission for it.
 
@@ -244,10 +317,13 @@ produced an activity record, and that an Administrator can view reports aggregat
 - **FR-029**: The user who uploaded a document MUST be able to replace its file with a new version that passes the same validation, after which the superseded file MUST be removed from storage.
 - **FR-030**: The user who uploaded a document MUST be able to delete it; a Project Manager MUST be able to delete any document in a project they manage.
 - **FR-031**: System MUST require explicit confirmation before deleting, and MUST permanently remove both the metadata record and the stored file on confirmation.
+- **FR-031a**: System MUST remove every share of a document when that document is deleted, and MUST notify each recipient that the owner deleted it.
+- **FR-031b**: System MUST retain a project's documents when that project is deleted, disassociating them from the project and leaving them as the uploader's personal documents with category preserved.
+- **FR-031c**: System MUST leave a project's documents associated with that project when a member is removed from it, while preserving that member's uploader rights over documents they uploaded.
 
 **Sharing and notification**
 
-- **FR-032**: A document owner MUST be able to share a document with specific other users.
+- **FR-032**: A document owner MUST be able to share a document with specific individually named users. Sharing with a department, team, or project as a unit is out of scope; project-wide access is conferred by project association instead.
 - **FR-033**: System MUST notify recipients in-app when a document is shared with them.
 - **FR-034**: Recipients MUST see documents shared with them in a distinct "Shared with Me" view, with read and download access only.
 - **FR-035**: System MUST notify project members when a new document is added to their project.
@@ -308,6 +384,9 @@ produced an activity record, and that an Administrator can view reports aggregat
 - The existing in-app notification system is reused for document notifications rather than replaced.
 - Cloud migration to blob storage is a future concern to be designed for, not implemented.
 - Users may operate with no internet connection.
+- Content validation is not anti-malware scanning. The build knowingly ships without a real
+  scanning engine because it must run offline, and exposes the seam where one belongs.
+- Metadata edits are last-write-wins; concurrent editing is not detected or reconciled.
 
 ## Out of Scope
 
@@ -319,3 +398,6 @@ produced an activity record, and that an Administrator can view reports aggregat
 - Document templates and document generation
 - Storage quotas and quota management
 - Soft delete, trash, and recovery
+- Sharing with departments, teams, or projects as a unit
+- Deduplication of identical uploads
+- Conflict detection on concurrent metadata edits
