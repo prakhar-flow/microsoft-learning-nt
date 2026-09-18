@@ -1,0 +1,186 @@
+@using ContosoDashboard.Services
+@using ContosoDashboard.Models
+@using Microsoft.AspNetCore.Components.Forms
+@inject IDocumentService DocumentService
+
+@if (isVisible && task != null)
+{
+    <div class="modal fade show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@task.Title &mdash; Documents</h5>
+                    <button type="button" class="btn-close" @onclick="Close" disabled="@isUploading"></button>
+                </div>
+                <div class="modal-body">
+                    @if (errorMessage != null)
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+
+                    @if (documents == null)
+                    {
+                        <p><em>Loading...</em></p>
+                    }
+                    else if (!documents.Any())
+                    {
+                        <p class="text-muted">No documents are attached to this task.</p>
+                    }
+                    else
+                    {
+                        <ul class="list-unstyled">
+                            @foreach (var document in documents)
+                            {
+                                <li class="mb-2 d-flex justify-content-between align-items-center">
+                                    <span>
+                                        <a href="/documents/@document.DocumentId">@document.Title</a>
+                                        <br />
+                                        <small class="text-muted">
+                                            @document.UploadedByUser?.DisplayName
+                                            &middot; @document.UploadedDate.ToLocalTime().ToString("d")
+                                        </small>
+                                    </span>
+                                    <a class="btn btn-sm btn-outline-secondary"
+                                       href="/api/documents/@document.DocumentId/content?disposition=attachment">
+                                        <span class="bi bi-download"></span>
+                                    </a>
+                                </li>
+                            }
+                        </ul>
+                    }
+
+                    <hr />
+                    <h6>Attach a document</h6>
+                    <div class="mb-2">
+                        <InputFile @key="inputKey" OnChange="HandleFileSelected" class="form-control"
+                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png" />
+                    </div>
+                    <div class="mb-2">
+                        <input class="form-control" placeholder="Title" @bind="title" maxlength="255" />
+                    </div>
+                    <div class="mb-2">
+                        <select class="form-select" @bind="category">
+                            @foreach (var option in DocumentCategories.All)
+                            {
+                                <option value="@option">@option</option>
+                            }
+                        </select>
+                    </div>
+                    @if (task.ProjectId.HasValue)
+                    {
+                        <p class="text-muted"><small>This document will be associated with the task's project.</small></p>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="Close" disabled="@isUploading">Close</button>
+                    <button class="btn btn-primary" @onclick="Upload" disabled="@(isUploading || content == null)">
+                        Attach
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    [Parameter] public int CurrentUserId { get; set; }
+
+    private bool isVisible;
+    private bool isUploading;
+    private string? errorMessage;
+    private TaskItem? task;
+    private List<Document>? documents;
+
+    private string title = string.Empty;
+    private string category = DocumentCategories.ProjectDocuments;
+    private string? fileName;
+    private long fileSize;
+    private string? contentType;
+    private MemoryStream? content;
+    private Guid inputKey = Guid.NewGuid();
+
+    public async Task ShowAsync(TaskItem taskItem)
+    {
+        task = taskItem;
+        isVisible = true;
+        Reset();
+        documents = await DocumentService.GetTaskDocumentsAsync(taskItem.TaskId, CurrentUserId);
+        StateHasChanged();
+    }
+
+    private void Close()
+    {
+        isVisible = false;
+        Reset();
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        var file = e.File;
+
+        fileName = file.Name;
+        fileSize = file.Size;
+        contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType;
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            title = Path.GetFileNameWithoutExtension(file.Name);
+        }
+
+        if (fileSize > FileValidationService.MaxFileSizeBytes)
+        {
+            errorMessage = "The file exceeds the 25 MB limit.";
+            content = null;
+            return;
+        }
+
+        var buffer = new MemoryStream();
+        await using (var stream = file.OpenReadStream(FileValidationService.MaxFileSizeBytes))
+        {
+            await stream.CopyToAsync(buffer);
+        }
+        buffer.Position = 0;
+        content = buffer;
+    }
+
+    private async Task Upload()
+    {
+        if (content == null || fileName == null || task == null) return;
+
+        isUploading = true;
+        errorMessage = null;
+
+        // A document attached to a task belongs to that task's project.
+        var request = new DocumentUploadRequest(
+            title, null, category, null, task.ProjectId, task.TaskId,
+            fileName, contentType!, fileSize, content);
+
+        var result = await DocumentService.UploadAsync(request, CurrentUserId);
+        isUploading = false;
+
+        if (!result.Succeeded)
+        {
+            errorMessage = result.Error;
+            return;
+        }
+
+        Reset();
+        documents = await DocumentService.GetTaskDocumentsAsync(task.TaskId, CurrentUserId);
+    }
+
+    private void Reset()
+    {
+        title = string.Empty;
+        category = DocumentCategories.ProjectDocuments;
+        fileName = null;
+        fileSize = 0;
+        contentType = null;
+        content?.Dispose();
+        content = null;
+        errorMessage = null;
+        isUploading = false;
+        inputKey = Guid.NewGuid();
+    }
+}

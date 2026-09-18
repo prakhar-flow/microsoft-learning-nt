@@ -26,7 +26,20 @@ public interface IDocumentService
 {
     Task<DocumentUploadResult> UploadAsync(DocumentUploadRequest request, int actingUserId);
     Task<List<Document>> GetMyDocumentsAsync(int actingUserId);
+    Task<DocumentPage> GetMyDocumentsAsync(int actingUserId, DocumentQuery query);
+    Task<DocumentPage> GetProjectDocumentsAsync(int projectId, int actingUserId, DocumentQuery query);
+    Task<DocumentPage> GetSharedWithMeAsync(int actingUserId, DocumentQuery query);
+    Task<DocumentPage> SearchAsync(string term, int actingUserId, DocumentQuery query);
+    Task<Document?> GetByIdAsync(int documentId, int actingUserId);
+    Task<Stream?> OpenContentAsync(int documentId, int actingUserId);
+    Task<bool> UpdateMetadataAsync(int documentId, DocumentMetadataUpdate update, int actingUserId);
+    Task<bool> ReplaceFileAsync(int documentId, DocumentFileReplacement replacement, int actingUserId);
+    Task<bool> DeleteAsync(int documentId, int actingUserId);
+    Task<bool> ShareAsync(int documentId, int recipientUserId, int actingUserId);
+    Task<List<Document>> GetTaskDocumentsAsync(int taskItemId, int actingUserId);
+    Task<List<Document>> GetRecentAsync(int actingUserId, int count);
     Task<int> GetCountAsync(int actingUserId);
+    Task<DocumentReport?> GetReportAsync(int actingUserId);
 }
 
 public class DocumentService : IDocumentService
@@ -145,8 +158,411 @@ public class DocumentService : IDocumentService
             .OrderByDescending(d => d.UploadedDate)
             .ToListAsync();
 
+    public Task<DocumentPage> GetMyDocumentsAsync(int actingUserId, DocumentQuery query) =>
+        PageAsync(_context.Documents.Where(d => d.UploadedByUserId == actingUserId), query);
+
+    public async Task<DocumentPage> GetProjectDocumentsAsync(int projectId, int actingUserId, DocumentQuery query)
+    {
+        if (!await IsProjectMemberAsync(projectId, actingUserId) && !await IsAdministratorAsync(actingUserId))
+        {
+            return new DocumentPage(Array.Empty<Document>(), 0, query.Page, query.PageSize);
+        }
+
+        return await PageAsync(_context.Documents.Where(d => d.ProjectId == projectId), query);
+    }
+
+    public Task<DocumentPage> GetSharedWithMeAsync(int actingUserId, DocumentQuery query) =>
+        PageAsync(
+            _context.Documents.Where(d =>
+                d.UploadedByUserId != actingUserId &&
+                d.Shares.Any(sh => sh.SharedWithUserId == actingUserId)),
+            query);
+
+    public async Task<DocumentPage> SearchAsync(string term, int actingUserId, DocumentQuery query)
+    {
+        var accessible = await AccessibleDocumentsAsync(actingUserId);
+
+        if (!string.IsNullOrWhiteSpace(term))
+        {
+            var pattern = $"%{term.Trim()}%";
+            accessible = accessible.Where(d =>
+                EF.Functions.Like(d.Title, pattern) ||
+                (d.Description != null && EF.Functions.Like(d.Description, pattern)) ||
+                (d.Tags != null && EF.Functions.Like(d.Tags, pattern)) ||
+                EF.Functions.Like(d.UploadedByUser.DisplayName, pattern) ||
+                (d.Project != null && EF.Functions.Like(d.Project.Name, pattern)));
+        }
+
+        return await PageAsync(accessible, query);
+    }
+
+    public async Task<Document?> GetByIdAsync(int documentId, int actingUserId)
+    {
+        var document = await _context.Documents
+            .Include(d => d.Project)
+            .Include(d => d.UploadedByUser)
+            .Include(d => d.Shares)
+            .FirstOrDefaultAsync(d => d.DocumentId == documentId);
+
+        if (document == null)
+        {
+            return null;
+        }
+
+        // Unauthorized and nonexistent are deliberately indistinguishable, so that
+        // enumerating identifiers reveals nothing about which documents exist.
+        return await CanReadAsync(document, actingUserId) ? document : null;
+    }
+
+    public async Task<Stream?> OpenContentAsync(int documentId, int actingUserId)
+    {
+        var document = await GetByIdAsync(documentId, actingUserId);
+        if (document == null)
+        {
+            return null;
+        }
+
+        var content = await _storage.DownloadAsync(document.StoragePath);
+        if (content == null)
+        {
+            _logger.LogWarning(
+                "Document {DocumentId} has no file at {StoragePath}.", documentId, document.StoragePath);
+            return null;
+        }
+
+        await RecordActivityAsync(documentId, actingUserId, DocumentActions.Download);
+        return content;
+    }
+
+    public async Task<bool> UpdateMetadataAsync(int documentId, DocumentMetadataUpdate update, int actingUserId)
+    {
+        var document = await _context.Documents.FindAsync(documentId);
+        if (document == null || document.UploadedByUserId != actingUserId)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(update.Title) || !DocumentCategories.All.Contains(update.Category))
+        {
+            return false;
+        }
+
+        var tags = NormalizeTags(update.Tags, out var tagError);
+        if (tagError != null)
+        {
+            return false;
+        }
+
+        document.Title = update.Title.Trim();
+        document.Description = string.IsNullOrWhiteSpace(update.Description) ? null : update.Description.Trim();
+        document.Category = update.Category;
+        document.Tags = tags;
+        document.UpdatedDate = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> ReplaceFileAsync(int documentId, DocumentFileReplacement replacement, int actingUserId)
+    {
+        var document = await _context.Documents.FindAsync(documentId);
+        if (document == null || document.UploadedByUserId != actingUserId)
+        {
+            return false;
+        }
+
+        var validation = _validation.Validate(
+            replacement.OriginalFileName, replacement.ContentType, replacement.FileSizeBytes, replacement.Content);
+
+        if (!validation.IsValid)
+        {
+            return false;
+        }
+
+        var supersededPath = document.StoragePath;
+        var newPath = BuildStoragePath(actingUserId, document.ProjectId, replacement.OriginalFileName);
+
+        replacement.Content.Position = 0;
+        await _storage.UploadAsync(replacement.Content, newPath, replacement.ContentType);
+
+        document.StoragePath = newPath;
+        document.OriginalFileName = replacement.OriginalFileName;
+        document.ContentType = replacement.ContentType;
+        document.FileSizeBytes = replacement.FileSizeBytes;
+        document.UpdatedDate = DateTime.UtcNow;
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Replacing document {DocumentId} failed; removing {Path}.", documentId, newPath);
+            await _storage.DeleteAsync(newPath);
+            return false;
+        }
+
+        // Only once the row points at the new file is the old one safe to remove.
+        await _storage.DeleteAsync(supersededPath);
+        return true;
+    }
+
+    public async Task<bool> DeleteAsync(int documentId, int actingUserId)
+    {
+        var document = await _context.Documents
+            .Include(d => d.Shares)
+            .Include(d => d.Project)
+            .FirstOrDefaultAsync(d => d.DocumentId == documentId);
+
+        if (document == null || !await CanDeleteAsync(document, actingUserId))
+        {
+            return false;
+        }
+
+        var recipients = document.Shares.Select(sh => sh.SharedWithUserId).ToList();
+        var title = document.Title;
+        var storagePath = document.StoragePath;
+
+        await RecordActivityAsync(documentId, actingUserId, DocumentActions.Delete);
+
+        _context.Documents.Remove(document);
+        await _context.SaveChangesAsync();
+
+        await _storage.DeleteAsync(storagePath);
+
+        foreach (var recipient in recipients)
+        {
+            await _notifications.CreateNotificationAsync(new Notification
+            {
+                UserId = recipient,
+                Title = "Shared document deleted",
+                Message = $"\"{title}\" was deleted by its owner and is no longer available.",
+                Type = NotificationType.DocumentDeleted,
+                Priority = NotificationPriority.Informational
+            });
+        }
+
+        return true;
+    }
+
+    public async Task<bool> ShareAsync(int documentId, int recipientUserId, int actingUserId)
+    {
+        var document = await _context.Documents.FindAsync(documentId);
+        if (document == null || document.UploadedByUserId != actingUserId)
+        {
+            return false;
+        }
+
+        if (recipientUserId == document.UploadedByUserId)
+        {
+            return false;
+        }
+
+        if (!await _context.Users.AnyAsync(u => u.UserId == recipientUserId))
+        {
+            return false;
+        }
+
+        var alreadyShared = await _context.DocumentShares.AnyAsync(sh =>
+            sh.DocumentId == documentId && sh.SharedWithUserId == recipientUserId);
+
+        if (alreadyShared)
+        {
+            return true;
+        }
+
+        _context.DocumentShares.Add(new DocumentShare
+        {
+            DocumentId = documentId,
+            SharedWithUserId = recipientUserId,
+            SharedByUserId = actingUserId
+        });
+
+        await _context.SaveChangesAsync();
+        await RecordActivityAsync(documentId, actingUserId, DocumentActions.Share);
+
+        await _notifications.CreateNotificationAsync(new Notification
+        {
+            UserId = recipientUserId,
+            Title = "Document shared with you",
+            Message = $"\"{document.Title}\" was shared with you.",
+            Type = NotificationType.DocumentShared,
+            Priority = NotificationPriority.Informational
+        });
+
+        return true;
+    }
+
+    public async Task<List<Document>> GetTaskDocumentsAsync(int taskItemId, int actingUserId)
+    {
+        var accessible = await AccessibleDocumentsAsync(actingUserId);
+
+        return await accessible
+            .Where(d => d.TaskItemId == taskItemId)
+            .Include(d => d.UploadedByUser)
+            .OrderByDescending(d => d.UploadedDate)
+            .ToListAsync();
+    }
+
+    public async Task<List<Document>> GetRecentAsync(int actingUserId, int count) =>
+        await _context.Documents
+            .Where(d => d.UploadedByUserId == actingUserId)
+            .Include(d => d.Project)
+            .OrderByDescending(d => d.UploadedDate)
+            .Take(count)
+            .ToListAsync();
+
     public async Task<int> GetCountAsync(int actingUserId) =>
         await _context.Documents.CountAsync(d => d.UploadedByUserId == actingUserId);
+
+    public async Task<DocumentReport?> GetReportAsync(int actingUserId)
+    {
+        if (!await IsAdministratorAsync(actingUserId))
+        {
+            return null;
+        }
+
+        var types = await _context.Documents
+            .GroupBy(d => d.ContentType)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count)
+            .Take(10)
+            .ToListAsync();
+
+        var uploaders = await _context.Documents
+            .GroupBy(d => d.UploadedByUser.DisplayName)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count)
+            .Take(10)
+            .ToListAsync();
+
+        var patterns = await _context.DocumentActivities
+            .GroupBy(a => a.Action)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count)
+            .ToListAsync();
+
+        return new DocumentReport(
+            types.Select(t => (t.Key, t.Count)).ToList(),
+            uploaders.Select(u => (u.Key, u.Count)).ToList(),
+            patterns.Select(p => (p.Key, p.Count)).ToList());
+    }
+
+    // The permission filter is composed into the query itself, so a document the user
+    // may not see is never materialized.
+    private async Task<IQueryable<Document>> AccessibleDocumentsAsync(int actingUserId)
+    {
+        var user = await _context.Users.FindAsync(actingUserId);
+        if (user == null)
+        {
+            return _context.Documents.Where(d => false);
+        }
+
+        if (user.Role == UserRole.Administrator)
+        {
+            return _context.Documents;
+        }
+
+        var department = user.Department;
+
+        return _context.Documents.Where(d =>
+            d.UploadedByUserId == actingUserId ||
+            d.Shares.Any(sh => sh.SharedWithUserId == actingUserId) ||
+            (d.ProjectId != null && d.Project!.ProjectManagerId == actingUserId) ||
+            (d.ProjectId != null && d.Project!.ProjectMembers.Any(pm => pm.UserId == actingUserId)) ||
+            (user.Role == UserRole.TeamLead && department != null &&
+             d.UploadedByUser.Department == department));
+    }
+
+    private async Task<bool> CanReadAsync(Document document, int actingUserId)
+    {
+        var accessible = await AccessibleDocumentsAsync(actingUserId);
+        return await accessible.AnyAsync(d => d.DocumentId == document.DocumentId);
+    }
+
+    private async Task<bool> CanDeleteAsync(Document document, int actingUserId)
+    {
+        if (document.UploadedByUserId == actingUserId)
+        {
+            return true;
+        }
+
+        return document.ProjectId != null &&
+               await _context.Projects.AnyAsync(p =>
+                   p.ProjectId == document.ProjectId && p.ProjectManagerId == actingUserId);
+    }
+
+    private async Task<bool> IsAdministratorAsync(int userId) =>
+        await _context.Users.AnyAsync(u => u.UserId == userId && u.Role == UserRole.Administrator);
+
+    private async Task RecordActivityAsync(int documentId, int userId, string action)
+    {
+        _context.DocumentActivities.Add(new DocumentActivity
+        {
+            DocumentId = documentId,
+            UserId = userId,
+            Action = action
+        });
+
+        await _context.SaveChangesAsync();
+    }
+
+    private static async Task<DocumentPage> PageAsync(IQueryable<Document> source, DocumentQuery query)
+    {
+        source = ApplyFilters(source, query);
+
+        var total = await source.CountAsync();
+
+        var page = Math.Max(1, query.Page);
+        var pageSize = query.PageSize <= 0 ? 25 : query.PageSize;
+
+        var items = await ApplySort(source, query)
+            .Include(d => d.Project)
+            .Include(d => d.UploadedByUser)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new DocumentPage(items, total, page, pageSize);
+    }
+
+    private static IQueryable<Document> ApplyFilters(IQueryable<Document> source, DocumentQuery query)
+    {
+        if (!string.IsNullOrWhiteSpace(query.Category))
+        {
+            source = source.Where(d => d.Category == query.Category);
+        }
+
+        if (query.ProjectId.HasValue)
+        {
+            source = source.Where(d => d.ProjectId == query.ProjectId);
+        }
+
+        if (query.FromDate.HasValue)
+        {
+            source = source.Where(d => d.UploadedDate >= query.FromDate.Value);
+        }
+
+        if (query.ToDate.HasValue)
+        {
+            source = source.Where(d => d.UploadedDate <= query.ToDate.Value);
+        }
+
+        return source;
+    }
+
+    private static IQueryable<Document> ApplySort(IQueryable<Document> source, DocumentQuery query) =>
+        (query.SortBy, query.Descending) switch
+        {
+            (DocumentSortColumn.Title, true) => source.OrderByDescending(d => d.Title),
+            (DocumentSortColumn.Title, false) => source.OrderBy(d => d.Title),
+            (DocumentSortColumn.Category, true) => source.OrderByDescending(d => d.Category),
+            (DocumentSortColumn.Category, false) => source.OrderBy(d => d.Category),
+            (DocumentSortColumn.FileSize, true) => source.OrderByDescending(d => d.FileSizeBytes),
+            (DocumentSortColumn.FileSize, false) => source.OrderBy(d => d.FileSizeBytes),
+            (_, false) => source.OrderBy(d => d.UploadedDate),
+            _ => source.OrderByDescending(d => d.UploadedDate)
+        };
 
     private async Task<bool> IsProjectMemberAsync(int projectId, int userId) =>
         await _context.Projects.AnyAsync(p =>

@@ -6,14 +6,15 @@
 @attribute [Authorize]
 @inject IDocumentService DocumentService
 @inject IProjectService ProjectService
+@inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
-<PageTitle>My Documents - ContosoDashboard</PageTitle>
+<PageTitle>Documents - ContosoDashboard</PageTitle>
 
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col">
-            <h1>My Documents</h1>
+            <h1>Documents</h1>
         </div>
         <div class="col-auto">
             <button class="btn btn-primary" @onclick="ShowUpload" disabled="@(currentUserId == 0)">
@@ -30,15 +31,59 @@
         </div>
     }
 
-    @if (documents == null)
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link @(view == DocumentView.Mine ? "active" : "")"
+               href="javascript:void(0)" @onclick="() => SwitchView(DocumentView.Mine)">My Documents</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(view == DocumentView.SharedWithMe ? "active" : "")"
+               href="javascript:void(0)" @onclick="() => SwitchView(DocumentView.SharedWithMe)">Shared with Me</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(view == DocumentView.Search ? "active" : "")"
+               href="javascript:void(0)" @onclick="() => SwitchView(DocumentView.Search)">Search</a>
+        </li>
+    </ul>
+
+    <div class="row g-2 mb-3">
+        @if (view == DocumentView.Search)
+        {
+            <div class="col-md-4">
+                <input class="form-control" placeholder="Search title, description, tags, uploader, project"
+                       @bind="searchTerm" @bind:event="oninput" @onkeyup="OnSearchKey" />
+            </div>
+        }
+        <div class="col-md-3">
+            <select class="form-select" @bind="filterCategory" @bind:after="ReloadAsync">
+                <option value="">All categories</option>
+                @foreach (var option in DocumentCategories.All)
+                {
+                    <option value="@option">@option</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @bind="filterProjectId" @bind:after="ReloadAsync">
+                <option value="0">All projects</option>
+                @foreach (var project in userProjects)
+                {
+                    <option value="@project.ProjectId">@project.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input type="date" class="form-control" @bind="filterFrom" @bind:after="ReloadAsync" />
+        </div>
+    </div>
+
+    @if (results == null)
     {
         <p><em>Loading documents...</em></p>
     }
-    else if (!documents.Any())
+    else if (!results.Items.Any())
     {
-        <div class="alert alert-info">
-            You have not uploaded any documents yet. Select <strong>Upload Document</strong> to add one.
-        </div>
+        <div class="alert alert-info">@EmptyMessage()</div>
     }
     else
     {
@@ -46,35 +91,97 @@
             <table class="table table-hover align-middle">
                 <thead>
                     <tr>
-                        <th>Title</th>
-                        <th>Category</th>
+                        <th><a href="javascript:void(0)" @onclick="() => SortBy(DocumentSortColumn.Title)">Title @SortIndicator(DocumentSortColumn.Title)</a></th>
+                        <th><a href="javascript:void(0)" @onclick="() => SortBy(DocumentSortColumn.Category)">Category @SortIndicator(DocumentSortColumn.Category)</a></th>
                         <th>Project</th>
-                        <th>Size</th>
-                        <th>Type</th>
-                        <th>Uploaded</th>
+                        <th>Uploaded by</th>
+                        <th><a href="javascript:void(0)" @onclick="() => SortBy(DocumentSortColumn.FileSize)">Size @SortIndicator(DocumentSortColumn.FileSize)</a></th>
+                        <th><a href="javascript:void(0)" @onclick="() => SortBy(DocumentSortColumn.UploadedDate)">Uploaded @SortIndicator(DocumentSortColumn.UploadedDate)</a></th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var document in documents)
+                    @foreach (var document in results.Items)
                     {
                         <tr>
                             <td>
-                                <strong>@document.Title</strong>
+                                <a href="/documents/@document.DocumentId"><strong>@document.Title</strong></a>
                                 <br />
                                 <small class="text-muted">@document.OriginalFileName</small>
                             </td>
                             <td><span class="badge bg-secondary">@document.Category</span></td>
                             <td>@(document.Project?.Name ?? "-")</td>
+                            <td>@(document.UploadedByUser?.DisplayName ?? "-")</td>
                             <td>@FormatSize(document.FileSizeBytes)</td>
-                            <td><small class="text-muted">@document.ContentType</small></td>
                             <td>@document.UploadedDate.ToLocalTime().ToString("g")</td>
+                            <td class="text-end">
+                                @if (CanPreview(document.ContentType))
+                                {
+                                    <a class="btn btn-sm btn-outline-secondary"
+                                       href="/api/documents/@document.DocumentId/content?disposition=inline"
+                                       target="_blank" title="Preview">
+                                        <span class="bi bi-eye"></span>
+                                    </a>
+                                }
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="/api/documents/@document.DocumentId/content?disposition=attachment"
+                                   title="Download">
+                                    <span class="bi bi-download"></span>
+                                </a>
+                                @if (document.UploadedByUserId == currentUserId)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => ConfirmDelete(document)" title="Delete">
+                                        <span class="bi bi-trash"></span>
+                                    </button>
+                                }
+                            </td>
                         </tr>
                     }
                 </tbody>
             </table>
         </div>
+
+        @if (results.TotalPages > 1)
+        {
+            <nav>
+                <ul class="pagination">
+                    <li class="page-item @(results.Page <= 1 ? "disabled" : "")">
+                        <a class="page-link" href="javascript:void(0)" @onclick="() => GoToPage(results.Page - 1)">Previous</a>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link">Page @results.Page of @results.TotalPages (@results.TotalCount documents)</span>
+                    </li>
+                    <li class="page-item @(results.Page >= results.TotalPages ? "disabled" : "")">
+                        <a class="page-link" href="javascript:void(0)" @onclick="() => GoToPage(results.Page + 1)">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        }
     }
 </div>
+
+@if (pendingDelete != null)
+{
+    <div class="modal fade show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete document</h5>
+                </div>
+                <div class="modal-body">
+                    <p>Permanently delete <strong>@pendingDelete.Title</strong>?</p>
+                    <p class="text-muted mb-0">This cannot be undone. Anyone it was shared with will be notified.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => pendingDelete = null">Cancel</button>
+                    <button class="btn btn-danger" @onclick="DeleteConfirmed">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
 
 <DocumentUploadModal @ref="uploadModal"
                      UserProjects="userProjects"
@@ -82,32 +189,124 @@
                      OnUploadCompleted="HandleUploadCompleted" />
 
 @code {
-    private List<Document>? documents;
+    private enum DocumentView { Mine, SharedWithMe, Search }
+
+    private DocumentPage? results;
     private List<Project> userProjects = new();
     private int currentUserId;
     private string? statusMessage;
     private bool statusIsError;
     private DocumentUploadModal? uploadModal;
+    private Document? pendingDelete;
+
+    private DocumentView view = DocumentView.Mine;
+    private string searchTerm = string.Empty;
+    private string filterCategory = string.Empty;
+    private int filterProjectId;
+    private DateTime? filterFrom;
+    private DocumentSortColumn sortColumn = DocumentSortColumn.UploadedDate;
+    private bool sortDescending = true;
+    private int currentPage = 1;
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+        var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
 
         if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
         {
             currentUserId = userId;
             userProjects = await ProjectService.GetUserProjectsAsync(userId);
-            documents = await DocumentService.GetMyDocumentsAsync(userId);
+            await ReloadAsync();
         }
         else
         {
-            documents = new List<Document>();
+            results = new DocumentPage(Array.Empty<Document>(), 0, 1, 25);
         }
     }
 
+    private DocumentQuery BuildQuery() => new()
+    {
+        SortBy = sortColumn,
+        Descending = sortDescending,
+        Category = string.IsNullOrEmpty(filterCategory) ? null : filterCategory,
+        ProjectId = filterProjectId == 0 ? null : filterProjectId,
+        FromDate = filterFrom,
+        Page = currentPage,
+        PageSize = 25
+    };
+
+    private async Task ReloadAsync()
+    {
+        if (currentUserId == 0) return;
+
+        var query = BuildQuery();
+
+        results = view switch
+        {
+            DocumentView.SharedWithMe => await DocumentService.GetSharedWithMeAsync(currentUserId, query),
+            DocumentView.Search => await DocumentService.SearchAsync(searchTerm, currentUserId, query),
+            _ => await DocumentService.GetMyDocumentsAsync(currentUserId, query)
+        };
+    }
+
+    private async Task SwitchView(DocumentView next)
+    {
+        view = next;
+        currentPage = 1;
+        await ReloadAsync();
+    }
+
+    private async Task OnSearchKey(KeyboardEventArgs args)
+    {
+        currentPage = 1;
+        await ReloadAsync();
+    }
+
+    private async Task SortBy(DocumentSortColumn column)
+    {
+        if (sortColumn == column)
+        {
+            sortDescending = !sortDescending;
+        }
+        else
+        {
+            sortColumn = column;
+            sortDescending = true;
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task GoToPage(int target)
+    {
+        if (results == null || target < 1 || target > results.TotalPages) return;
+        currentPage = target;
+        await ReloadAsync();
+    }
+
+    private string SortIndicator(DocumentSortColumn column) =>
+        sortColumn != column ? string.Empty : sortDescending ? "▼" : "▲";
+
     private void ShowUpload() => uploadModal?.Show();
+
+    private void ConfirmDelete(Document document) => pendingDelete = document;
+
+    private async Task DeleteConfirmed()
+    {
+        if (pendingDelete == null) return;
+
+        var title = pendingDelete.Title;
+        var deleted = await DocumentService.DeleteAsync(pendingDelete.DocumentId, currentUserId);
+        pendingDelete = null;
+
+        statusIsError = !deleted;
+        statusMessage = deleted
+            ? $"\"{title}\" was deleted."
+            : "The document could not be deleted.";
+
+        await ReloadAsync();
+    }
 
     private async Task HandleUploadCompleted((bool Succeeded, string Message) result)
     {
@@ -116,9 +315,19 @@
 
         if (result.Succeeded)
         {
-            documents = await DocumentService.GetMyDocumentsAsync(currentUserId);
+            await ReloadAsync();
         }
     }
+
+    private string EmptyMessage() => view switch
+    {
+        DocumentView.SharedWithMe => "No documents have been shared with you.",
+        DocumentView.Search => "No documents match your search.",
+        _ => "You have not uploaded any documents yet. Select Upload Document to add one."
+    };
+
+    private static bool CanPreview(string contentType) =>
+        contentType == "application/pdf" || contentType.StartsWith("image/", StringComparison.Ordinal);
 
     private static string FormatSize(long bytes)
     {

@@ -1,0 +1,49 @@
+@using ContosoDashboard.Services
+@using ContosoDashboard.Models
+@inject IDocumentService DocumentService
+
+<div class="card h-100">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Recent Documents</span>
+        <a href="/documents" class="btn btn-sm btn-outline-secondary">View all</a>
+    </div>
+    <div class="card-body">
+        @if (documents == null)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else if (!documents.Any())
+        {
+            <p class="text-muted mb-0">You have not uploaded any documents yet.</p>
+        }
+        else
+        {
+            <ul class="list-unstyled mb-0">
+                @foreach (var document in documents)
+                {
+                    <li class="mb-2">
+                        <a href="/documents/@document.DocumentId">@document.Title</a>
+                        <br />
+                        <small class="text-muted">
+                            @document.Category &middot; @document.UploadedDate.ToLocalTime().ToString("d")
+                        </small>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int UserId { get; set; }
+
+    private List<Document>? documents;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (UserId > 0)
+        {
+            documents = await DocumentService.GetRecentAsync(UserId, 5);
+        }
+    }
+}

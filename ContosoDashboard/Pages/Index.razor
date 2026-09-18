@@ -6,6 +6,7 @@
 @inject IDashboardService DashboardService
 @inject INotificationService NotificationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ContosoDashboard.Services.IDocumentService DocumentService
 
 <PageTitle>Dashboard - ContosoDashboard</PageTitle>
 
@@ -52,12 +53,26 @@
                     </div>
                 </div>
             </div>
+            <div class="col-md-3 mb-3">
+                <div class="card summary-card">
+                    <div class="card-body">
+                        <h5 class="card-title">My Documents</h5>
+                        <p class="card-text display-4 text-success">@documentCount</p>
+                    </div>
+                </div>
+            </div>
         </div>
     }
 
     @if (announcements != null && announcements.Any())
     {
         <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <RecentDocumentsWidget UserId="currentUserId" />
+        </div>
+    </div>
+
+    <div class="row mb-4">
             <div class="col">
                 <h3>Announcements</h3>
                 @foreach (var announcement in announcements)
@@ -126,6 +141,7 @@
     private List<Notification>? recentNotifications;
     private string userName = "User";
     private int currentUserId = 0;
+    private int documentCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -146,6 +162,7 @@
             summary = await DashboardService.GetDashboardSummaryAsync(currentUserId);
             announcements = await DashboardService.GetActiveAnnouncementsAsync();
             recentNotifications = await NotificationService.GetUserNotificationsAsync(currentUserId);
+            documentCount = await DocumentService.GetCountAsync(currentUserId);
         }
     }
 

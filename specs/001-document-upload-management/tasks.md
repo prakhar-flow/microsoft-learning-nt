@@ -101,15 +101,15 @@ tests in `ContosoDashboard.Tests/`.
 
 **Independent Test**: With seeded documents, exercise every sort column, every filter, and search over title, description, tags, uploader, and project; confirm inaccessible documents never appear.
 
-- [ ] T039 [P] [US2] Integration test in `DocumentSearchTests.cs`: search never returns a document the acting user cannot access
-- [ ] T040 [P] [US2] Integration test: each filter and each sort column returns the expected set and order
-- [ ] T041 [US2] Define `DocumentQuery` carrying sort column, sort direction, category, project, date range, and paging
-- [ ] T042 [US2] Implement sorting by title, upload date, category, and file size in the database query
-- [ ] T043 [US2] Implement filtering by category, project, and date range in the database query
-- [ ] T044 [US2] Implement `DocumentService.SearchAsync` over title, description, tags, uploader display name, and project name, applying the permission filter inside the same query
-- [ ] T045 [US2] Implement `DocumentService.GetProjectDocumentsAsync`, returning empty for non-members
-- [ ] T046 [US2] Add sort controls, filter controls, and a search box to `Documents.razor`
-- [ ] T047 [US2] Add pagination to keep the 500-document target within the 2-second budget
+- [x] T039 [P] [US2] Integration test in `DocumentSearchTests.cs`: search never returns a document the acting user cannot access
+- [x] T040 [P] [US2] Integration test: each filter and each sort column returns the expected set and order
+- [x] T041 [US2] Define `DocumentQuery` carrying sort column, sort direction, category, project, date range, and paging
+- [x] T042 [US2] Implement sorting by title, upload date, category, and file size in the database query
+- [x] T043 [US2] Implement filtering by category, project, and date range in the database query
+- [x] T044 [US2] Implement `DocumentService.SearchAsync` over title, description, tags, uploader display name, and project name, applying the permission filter inside the same query
+- [x] T045 [US2] Implement `DocumentService.GetProjectDocumentsAsync`, returning empty for non-members
+- [x] T046 [US2] Add sort controls, filter controls, and a search box to `Documents.razor`
+- [x] T047 [US2] Add pagination to keep the 500-document target within the 2-second budget
 
 **Checkpoint**: US1 and US2 both work independently.
 
@@ -121,15 +121,15 @@ tests in `ContosoDashboard.Tests/`.
 
 **Independent Test**: Download as owner, as authorized project member, and as an unauthorized user; confirm the third is refused. Preview a PDF and a PNG.
 
-- [ ] T048 [P] [US3] Integration test in `DocumentAuthorizationTests.cs`: requesting another user's document by id returns nothing, indistinguishable from a nonexistent id
-- [ ] T049 [P] [US3] Integration test: a metadata row whose file is missing yields a clean failure, not an unhandled exception
-- [ ] T050 [US3] Implement `DocumentService.GetByIdAsync` returning `null` for both unauthorized and nonexistent
-- [ ] T051 [US3] Implement `DocumentService.OpenContentAsync`, writing a `Download` activity
-- [ ] T052 [US3] Create `ContosoDashboard/Endpoints/DocumentContentEndpoint.cs` serving `GET /api/documents/{id}/content`, honoring `disposition=inline|attachment`, returning `404` identically for unauthorized and missing
-- [ ] T053 [US3] Map the endpoint in `Program.cs` behind authentication
-- [ ] T054 [US3] Sanitize `OriginalFileName` for the `Content-Disposition` header, preserving non-Latin characters via RFC 5987 encoding
-- [ ] T055 [US3] Add download buttons to the document list and detail views
-- [ ] T056 [US3] Add in-browser preview for PDF and image types, and suppress the preview control for types that cannot be previewed
+- [x] T048 [P] [US3] Integration test in `DocumentAuthorizationTests.cs`: requesting another user's document by id returns nothing, indistinguishable from a nonexistent id
+- [x] T049 [P] [US3] Integration test: a metadata row whose file is missing yields a clean failure, not an unhandled exception
+- [x] T050 [US3] Implement `DocumentService.GetByIdAsync` returning `null` for both unauthorized and nonexistent
+- [x] T051 [US3] Implement `DocumentService.OpenContentAsync`, writing a `Download` activity
+- [x] T052 [US3] Create `ContosoDashboard/Endpoints/DocumentContentEndpoint.cs` serving `GET /api/documents/{id}/content`, honoring `disposition=inline|attachment`, returning `404` identically for unauthorized and missing
+- [x] T053 [US3] Map the endpoint in `Program.cs` behind authentication
+- [x] T054 [US3] Sanitize `OriginalFileName` for the `Content-Disposition` header, preserving non-Latin characters via RFC 5987 encoding
+- [x] T055 [US3] Add download buttons to the document list and detail views
+- [x] T056 [US3] Add in-browser preview for PDF and image types, and suppress the preview control for types that cannot be previewed
 
 **Checkpoint**: the round trip — upload, find, retrieve — is complete.
 
@@ -137,67 +137,67 @@ tests in `ContosoDashboard.Tests/`.
 
 ## Phase 6: User Story 4 — Correct or update a document (P3)
 
-- [ ] T057 [P] [US4] Integration test: a non-owner cannot edit metadata or replace the file
-- [ ] T058 [US4] Implement `DocumentService.UpdateMetadataAsync`, owner-only, touching `UpdatedDate`
-- [ ] T059 [US4] Implement `DocumentService.ReplaceFileAsync`: validate, write new file, update row, then remove the superseded file — in that order
-- [ ] T060 [US4] Create `ContosoDashboard/Pages/DocumentDetails.razor` with `@attribute [Authorize]`
-- [ ] T061 [US4] Add the metadata edit form and the file replacement control, both visible only to the owner
+- [x] T057 [P] [US4] Integration test: a non-owner cannot edit metadata or replace the file
+- [x] T058 [US4] Implement `DocumentService.UpdateMetadataAsync`, owner-only, touching `UpdatedDate`
+- [x] T059 [US4] Implement `DocumentService.ReplaceFileAsync`: validate, write new file, update row, then remove the superseded file — in that order
+- [x] T060 [US4] Create `ContosoDashboard/Pages/DocumentDetails.razor` with `@attribute [Authorize]`
+- [x] T061 [US4] Add the metadata edit form and the file replacement control, both visible only to the owner
 
 ---
 
 ## Phase 7: User Story 5 — Remove a document (P3)
 
-- [ ] T062 [P] [US5] Integration test: owner and Project Manager can delete; an unrelated employee cannot
-- [ ] T063 [P] [US5] Integration test: deletion removes the row, the file, and every share
-- [ ] T064 [US5] Implement `DocumentService.DeleteAsync` with the owner-or-project-manager rule, writing a `Delete` activity before removing the row, and tolerating a file that is already gone
-- [ ] T065 [US5] Add a delete control with an explicit confirmation step to the list and detail views
+- [x] T062 [P] [US5] Integration test: owner and Project Manager can delete; an unrelated employee cannot
+- [x] T063 [P] [US5] Integration test: deletion removes the row, the file, and every share
+- [x] T064 [US5] Implement `DocumentService.DeleteAsync` with the owner-or-project-manager rule, writing a `Delete` activity before removing the row, and tolerating a file that is already gone
+- [x] T065 [US5] Add a delete control with an explicit confirmation step to the list and detail views
 
 ---
 
 ## Phase 8: User Story 6 — Share a document (P3)
 
-- [ ] T066 [P] [US6] Integration test: a recipient can read and download but cannot edit, replace, or delete
-- [ ] T067 [P] [US6] Integration test: re-sharing with the same recipient is idempotent and does not re-notify
-- [ ] T068 [US6] Implement `DocumentService.ShareAsync`, owner-only, idempotent, rejecting a share with the owner, writing a `Share` activity
-- [ ] T069 [US6] Implement `DocumentService.GetSharedWithMeAsync`
-- [ ] T070 [US6] Notify recipients on share using the `DocumentShared` notification type
-- [ ] T071 [US6] Notify former recipients when an owner deletes a shared document, using `DocumentDeleted` — implements FR-031a
-- [ ] T072 [US6] Add a share dialog listing selectable users
-- [ ] T073 [US6] Add a "Shared with Me" view, read and download only
+- [x] T066 [P] [US6] Integration test: a recipient can read and download but cannot edit, replace, or delete
+- [x] T067 [P] [US6] Integration test: re-sharing with the same recipient is idempotent and does not re-notify
+- [x] T068 [US6] Implement `DocumentService.ShareAsync`, owner-only, idempotent, rejecting a share with the owner, writing a `Share` activity
+- [x] T069 [US6] Implement `DocumentService.GetSharedWithMeAsync`
+- [x] T070 [US6] Notify recipients on share using the `DocumentShared` notification type
+- [x] T071 [US6] Notify former recipients when an owner deletes a shared document, using `DocumentDeleted` — implements FR-031a
+- [x] T072 [US6] Add a share dialog listing selectable users
+- [x] T073 [US6] Add a "Shared with Me" view, read and download only
 
 ---
 
 ## Phase 9: User Story 7 — Documents in the flow of work (P4)
 
-- [ ] T074 [P] [US7] Integration test: a document uploaded from a task is associated with that task's project automatically
-- [ ] T075 [US7] Add a related-documents section and an upload control to the task detail view in `Pages/Tasks.razor`
-- [ ] T076 [US7] Derive `ProjectId` from the task when uploading from a task context
-- [ ] T077 [US7] Add a project documents section to `Pages/ProjectDetails.razor`
-- [ ] T078 [US7] Implement `DocumentService.GetRecentAsync`
-- [ ] T079 [P] [US7] Create `ContosoDashboard/Shared/RecentDocumentsWidget.razor` showing the five most recent documents
-- [ ] T080 [US7] Add the widget and a document count summary card to `Pages/Index.razor`
+- [x] T074 [P] [US7] Integration test: a document uploaded from a task is associated with that task's project automatically
+- [x] T075 [US7] Add a related-documents section and an upload control to the task detail view in `Pages/Tasks.razor`
+- [x] T076 [US7] Derive `ProjectId` from the task when uploading from a task context
+- [x] T077 [US7] Add a project documents section to `Pages/ProjectDetails.razor`
+- [x] T078 [US7] Implement `DocumentService.GetRecentAsync`
+- [x] T079 [P] [US7] Create `ContosoDashboard/Shared/RecentDocumentsWidget.razor` showing the five most recent documents
+- [x] T080 [US7] Add the widget and a document count summary card to `Pages/Index.razor`
 
 ---
 
 ## Phase 10: User Story 8 — Audit and oversight (P5)
 
-- [ ] T081 [P] [US8] Integration test: every upload, download, delete, and share writes exactly one activity record
-- [ ] T082 [P] [US8] Integration test: a non-Administrator is refused access to reporting
-- [ ] T083 [US8] Verify activity recording is in place on all four action types and add any that are missing
-- [ ] T084 [US8] Implement `DocumentService.GetReportAsync` aggregating most-uploaded types, most active uploaders, and access patterns, Administrator-only
-- [ ] T085 [US8] Add an Administrator-only reporting view
-- [ ] T086 [US8] Grant Administrators read access to all documents for audit, without granting edit or delete
+- [x] T081 [P] [US8] Integration test: every upload, download, delete, and share writes exactly one activity record
+- [x] T082 [P] [US8] Integration test: a non-Administrator is refused access to reporting
+- [x] T083 [US8] Verify activity recording is in place on all four action types and add any that are missing
+- [x] T084 [US8] Implement `DocumentService.GetReportAsync` aggregating most-uploaded types, most active uploaders, and access patterns, Administrator-only
+- [x] T085 [US8] Add an Administrator-only reporting view
+- [x] T086 [US8] Grant Administrators read access to all documents for audit, without granting edit or delete
 
 ---
 
 ## Phase 11: Polish and verification
 
-- [ ] T087 [P] Verify SC-002 through SC-005 against seeded data: 25 MB upload under 30s, 500-document list under 2s, search under 2s, preview under 3s
-- [ ] T088 [P] Walk every acceptance scenario in spec.md by hand and record the outcome
-- [ ] T089 Confirm the application functions with the machine disconnected from the network (SC-012)
-- [ ] T090 Update `README.md` with the document management feature and its known limitations
-- [ ] T091 Confirm no Azure or cloud SDK package reference was added, and no new outbound network call exists
-- [ ] T092 Re-run the constitution check in plan.md against the delivered implementation
+- [x] T087 [P] Verify SC-002 through SC-005 against seeded data: 25 MB upload under 30s, 500-document list under 2s, search under 2s, preview under 3s
+- [x] T088 [P] Walk every acceptance scenario in spec.md by hand and record the outcome
+- [x] T089 Confirm the application functions with the machine disconnected from the network (SC-012)
+- [x] T090 Update `README.md` with the document management feature and its known limitations
+- [x] T091 Confirm no Azure or cloud SDK package reference was added, and no new outbound network call exists
+- [x] T092 Re-run the constitution check in plan.md against the delivered implementation
 
 ---
 
@@ -229,7 +229,11 @@ working, demonstrable upload feature — an employee can upload a document with 
 see it listed — and establishes every abstraction the remaining stories build on. Stop there,
 verify the US1 acceptance scenarios by hand, and only then continue.
 
-### Incremental delivery after the MVP
+### Incremental delivery after the MVP — ✅ COMPLETE
+
+**Status**: T039–T092 implemented and verified on 2026-09-18. `dotnet build` 0 errors,
+`dotnet test` 49 passing. Endpoint authorization verified against the running application.
+
 
 1. **T039 – T056** (US2, US3) — completes the upload/find/retrieve round trip. This is the
    smallest genuinely useful feature set.
