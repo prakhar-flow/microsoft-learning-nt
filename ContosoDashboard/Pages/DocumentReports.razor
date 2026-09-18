@@ -1,0 +1,82 @@
+@page "/documents/reports"
+@using ContosoDashboard.Services
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize(Policy = "Administrator")]
+@inject IDocumentService DocumentService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Document Reports - ContosoDashboard</PageTitle>
+
+<div class="container-fluid">
+    <h1 class="mb-4">Document Reports</h1>
+
+    @if (report == null)
+    {
+        <div class="alert alert-warning">
+            Document reporting is available to administrators only.
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header">Most uploaded document types</div>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var entry in report.MostUploadedTypes)
+                        {
+                            <li class="list-group-item d-flex justify-content-between">
+                                <small>@entry.ContentType</small>
+                                <span class="badge bg-primary">@entry.Count</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header">Most active uploaders</div>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var entry in report.MostActiveUploaders)
+                        {
+                            <li class="list-group-item d-flex justify-content-between">
+                                @entry.UserName
+                                <span class="badge bg-primary">@entry.Count</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header">Document access patterns</div>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var entry in report.AccessPatterns)
+                        {
+                            <li class="list-group-item d-flex justify-content-between">
+                                @entry.Action
+                                <span class="badge bg-primary">@entry.Count</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private DocumentReport? report;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+        {
+            report = await DocumentService.GetReportAsync(userId);
+        }
+    }
+}

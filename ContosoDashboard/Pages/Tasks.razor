@@ -123,6 +123,9 @@
                                 }
                             </td>
                             <td>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowDocuments(task)" title="Documents">
+                                    <span class="bi bi-paperclip"></span>
+                                </button>
                                 <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewTaskDetails(task.TaskId)">
                                     <i class="bi bi-eye"></i>
                                 </button>
@@ -135,11 +138,15 @@
     }
 </div>
 
+<TaskDocumentsModal @ref="documentsModal" CurrentUserId="currentUserId" />
+
 @code {
+
     private List<TaskItem>? tasks;
     private string filterStatus = "";
     private string filterPriority = "";
     private int currentUserId = 0;
+    private TaskDocumentsModal? documentsModal;
 
     protected override async Task OnInitializedAsync()
     {
@@ -200,5 +207,13 @@
             TaskPriority.Low => "secondary",
             _ => "secondary"
         };
+    }
+
+    private async Task ShowDocuments(TaskItem task)
+    {
+        if (documentsModal != null)
+        {
+            await documentsModal.ShowAsync(task);
+        }
     }
 }

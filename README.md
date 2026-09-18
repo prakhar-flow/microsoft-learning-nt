@@ -51,6 +51,40 @@ This application includes a **mock authentication system** designed for training
 
 ⚠️ **Important:** This mock authentication system is for **training only**. Production applications should use Azure AD, Identity Server, Auth0, or similar identity providers with proper password hashing, MFA, and OAuth 2.0/OpenID Connect.
 
+## Document Upload and Management
+
+Employees can upload work documents, organize them by category and project, share them with
+colleagues, and retrieve them later. Implemented via spec-driven development; the full
+specification, plan, and task breakdown live under `specs/001-document-upload-management/`.
+
+- Upload with title, category, description, project association and tags (25 MB limit;
+  PDF, Word, Excel, PowerPoint, text, JPEG and PNG)
+- Browse, sort, filter, search, and paginate; separate "Shared with Me" view
+- Download, and in-browser preview for PDFs and images
+- Edit metadata, replace the file, delete with confirmation
+- Share with named colleagues, with in-app notification
+- Documents on projects, on tasks, and on the dashboard
+- Administrator reporting over upload and access activity
+
+**Where files live**: outside `wwwroot`, under `ContosoDashboard/Storage/uploads/` with
+GUID-derived names, served only through `/api/documents/{id}/content` after an authorization
+check. The directory is git-ignored.
+
+### Known limitations
+
+These are deliberate and documented, not oversights:
+
+- **Content validation is not malware scanning.** The stakeholder requirements ask for virus
+  scanning and simultaneously forbid external dependencies; both cannot hold. Uploads are
+  checked for extension, declared MIME type, size, emptiness, and whether the leading bytes
+  match the claimed type, behind an `IFileValidationService` seam where a real engine belongs.
+- **Audit records do not outlive their document.** `DocumentActivity` rows cascade away on
+  deletion. A compliance-grade log would denormalize the title and survive.
+- **Metadata edits are last-write-wins.** Concurrent edits are not detected.
+- **Adding these tables requires deleting the existing database file**, because
+  `EnsureCreated()` does not alter an existing schema. Acceptable only because all data is
+  seeded.
+
 ## Overview
 
 ContosoDashboard is built using ASP.NET Core 8.0 with Blazor Server and provides a centralized platform for:

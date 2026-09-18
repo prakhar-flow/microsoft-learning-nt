@@ -1,0 +1,318 @@
+@page "/documents/{DocumentId:int}"
+@using ContosoDashboard.Services
+@using ContosoDashboard.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IDocumentService DocumentService
+@inject IUserService UserService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>@(document?.Title ?? "Document") - ContosoDashboard</PageTitle>
+
+<div class="container-fluid">
+    @if (loading)
+    {
+        <p><em>Loading document...</em></p>
+    }
+    else if (document == null)
+    {
+        <div class="alert alert-warning">
+            This document does not exist, or you do not have permission to view it.
+        </div>
+        <a class="btn btn-secondary" href="/documents">Back to documents</a>
+    }
+    else
+    {
+        <div class="row mb-3">
+            <div class="col">
+                <h1>@document.Title</h1>
+                <p class="text-muted mb-0">
+                    Uploaded by @document.UploadedByUser?.DisplayName
+                    on @document.UploadedDate.ToLocalTime().ToString("f")
+                </p>
+            </div>
+            <div class="col-auto">
+                <a class="btn btn-outline-secondary" href="/documents">Back</a>
+                <a class="btn btn-primary"
+                   href="/api/documents/@document.DocumentId/content?disposition=attachment">
+                    <span class="bi bi-download"></span> Download
+                </a>
+            </div>
+        </div>
+
+        @if (statusMessage != null)
+        {
+            <div class="alert @(statusIsError ? "alert-danger" : "alert-success")">@statusMessage</div>
+        }
+
+        <div class="row">
+            <div class="col-lg-7">
+                <div class="card mb-3">
+                    <div class="card-header">Details</div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">File</dt>
+                            <dd class="col-sm-8">@document.OriginalFileName</dd>
+                            <dt class="col-sm-4">Category</dt>
+                            <dd class="col-sm-8">@document.Category</dd>
+                            <dt class="col-sm-4">Size</dt>
+                            <dd class="col-sm-8">@FormatSize(document.FileSizeBytes)</dd>
+                            <dt class="col-sm-4">Type</dt>
+                            <dd class="col-sm-8">@document.ContentType</dd>
+                            <dt class="col-sm-4">Project</dt>
+                            <dd class="col-sm-8">@(document.Project?.Name ?? "None")</dd>
+                            <dt class="col-sm-4">Tags</dt>
+                            <dd class="col-sm-8">@(string.IsNullOrEmpty(document.Tags) ? "None" : document.Tags)</dd>
+                            <dt class="col-sm-4">Description</dt>
+                            <dd class="col-sm-8">@(string.IsNullOrEmpty(document.Description) ? "None" : document.Description)</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                @if (CanPreview(document.ContentType))
+                {
+                    <div class="card mb-3">
+                        <div class="card-header">Preview</div>
+                        <div class="card-body p-0">
+                            @if (document.ContentType.StartsWith("image/"))
+                            {
+                                <img src="/api/documents/@document.DocumentId/content?disposition=inline"
+                                     class="img-fluid" alt="@document.Title" />
+                            }
+                            else
+                            {
+                                <iframe src="/api/documents/@document.DocumentId/content?disposition=inline"
+                                        style="width:100%;height:600px;border:0"
+                                        title="@document.Title"></iframe>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (isOwner)
+            {
+                <div class="col-lg-5">
+                    <div class="card mb-3">
+                        <div class="card-header">Edit metadata</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Title</label>
+                                <input class="form-control" @bind="editTitle" maxlength="255" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Category</label>
+                                <select class="form-select" @bind="editCategory">
+                                    @foreach (var option in DocumentCategories.All)
+                                    {
+                                        <option value="@option">@option</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" rows="2" @bind="editDescription" maxlength="2000"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Tags</label>
+                                <input class="form-control" @bind="editTags" placeholder="comma,separated" />
+                            </div>
+                            <button class="btn btn-primary" @onclick="SaveMetadata">Save changes</button>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header">Replace file</div>
+                        <div class="card-body">
+                            <InputFile @key="replaceKey" OnChange="HandleReplacementSelected" class="form-control mb-2"
+                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png" />
+                            @if (replacementName != null)
+                            {
+                                <p class="mb-2"><small>@replacementName (@FormatSize(replacementSize))</small></p>
+                            }
+                            <button class="btn btn-outline-primary" @onclick="ReplaceFile"
+                                    disabled="@(replacementContent == null)">
+                                Replace file
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">Share</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <select class="form-select" @bind="shareUserId">
+                                    <option value="0">Select a person...</option>
+                                    @foreach (var user in shareableUsers)
+                                    {
+                                        <option value="@user.UserId">@user.DisplayName (@user.Role)</option>
+                                    }
+                                </select>
+                            </div>
+                            <button class="btn btn-outline-primary" @onclick="Share" disabled="@(shareUserId == 0)">
+                                Share document
+                            </button>
+
+                            @if (document.Shares.Any())
+                            {
+                                <hr />
+                                <p class="mb-1"><strong>Shared with</strong></p>
+                                <ul class="list-unstyled mb-0">
+                                    @foreach (var share in document.Shares)
+                                    {
+                                        <li>@(allUsers.FirstOrDefault(u => u.UserId == share.SharedWithUserId)?.DisplayName ?? "Unknown")</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int DocumentId { get; set; }
+
+    private Document? document;
+    private bool loading = true;
+    private bool isOwner;
+    private int currentUserId;
+    private string? statusMessage;
+    private bool statusIsError;
+
+    private string editTitle = string.Empty;
+    private string? editDescription;
+    private string editCategory = DocumentCategories.Other;
+    private string? editTags;
+
+    private List<User> allUsers = new();
+    private List<User> shareableUsers = new();
+    private int shareUserId;
+
+    private Guid replaceKey = Guid.NewGuid();
+    private string? replacementName;
+    private long replacementSize;
+    private string? replacementContentType;
+    private MemoryStream? replacementContent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+        {
+            currentUserId = userId;
+            allUsers = await UserService.GetAllUsersAsync();
+            await LoadAsync();
+        }
+
+        loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        document = await DocumentService.GetByIdAsync(DocumentId, currentUserId);
+
+        if (document == null)
+        {
+            isOwner = false;
+            return;
+        }
+
+        isOwner = document.UploadedByUserId == currentUserId;
+        editTitle = document.Title;
+        editDescription = document.Description;
+        editCategory = document.Category;
+        editTags = document.Tags;
+
+        var sharedIds = document.Shares.Select(s => s.SharedWithUserId).ToHashSet();
+        shareableUsers = allUsers
+            .Where(u => u.UserId != document.UploadedByUserId && !sharedIds.Contains(u.UserId))
+            .ToList();
+    }
+
+    private async Task SaveMetadata()
+    {
+        var update = new DocumentMetadataUpdate(editTitle, editDescription, editCategory, editTags);
+        var saved = await DocumentService.UpdateMetadataAsync(DocumentId, update, currentUserId);
+
+        statusIsError = !saved;
+        statusMessage = saved ? "Changes saved." : "The changes could not be saved. Check the title, category and tags.";
+
+        if (saved) await LoadAsync();
+    }
+
+    private async Task HandleReplacementSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        replacementName = file.Name;
+        replacementSize = file.Size;
+        replacementContentType = string.IsNullOrWhiteSpace(file.ContentType)
+            ? "application/octet-stream"
+            : file.ContentType;
+
+        if (replacementSize > FileValidationService.MaxFileSizeBytes)
+        {
+            statusIsError = true;
+            statusMessage = "The replacement file exceeds the 25 MB limit.";
+            replacementContent = null;
+            return;
+        }
+
+        var buffer = new MemoryStream();
+        await using (var stream = file.OpenReadStream(FileValidationService.MaxFileSizeBytes))
+        {
+            await stream.CopyToAsync(buffer);
+        }
+        buffer.Position = 0;
+        replacementContent = buffer;
+    }
+
+    private async Task ReplaceFile()
+    {
+        if (replacementContent == null || replacementName == null) return;
+
+        var replacement = new DocumentFileReplacement(
+            replacementName, replacementContentType!, replacementSize, replacementContent);
+
+        var replaced = await DocumentService.ReplaceFileAsync(DocumentId, replacement, currentUserId);
+
+        statusIsError = !replaced;
+        statusMessage = replaced ? "File replaced." : "The file could not be replaced.";
+
+        replacementContent?.Dispose();
+        replacementContent = null;
+        replacementName = null;
+        replacementSize = 0;
+        replaceKey = Guid.NewGuid();
+
+        if (replaced) await LoadAsync();
+    }
+
+    private async Task Share()
+    {
+        var shared = await DocumentService.ShareAsync(DocumentId, shareUserId, currentUserId);
+
+        statusIsError = !shared;
+        statusMessage = shared ? "Document shared." : "The document could not be shared.";
+        shareUserId = 0;
+
+        if (shared) await LoadAsync();
+    }
+
+    private static bool CanPreview(string contentType) =>
+        contentType == "application/pdf" || contentType.StartsWith("image/", StringComparison.Ordinal);
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024d:F0} KB";
+        return $"{bytes / 1024d / 1024d:F1} MB";
+    }
+}

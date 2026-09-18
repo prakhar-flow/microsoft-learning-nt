@@ -1,0 +1,58 @@
+@using ContosoDashboard.Services
+@using ContosoDashboard.Models
+@inject IDocumentService DocumentService
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Project Documents</span>
+        <a class="btn btn-sm btn-outline-primary" href="/documents">Upload</a>
+    </div>
+    <div class="card-body">
+        @if (documents == null)
+        {
+            <p><em>Loading documents...</em></p>
+        }
+        else if (!documents.Items.Any())
+        {
+            <p class="text-muted mb-0">No documents have been added to this project.</p>
+        }
+        else
+        {
+            <ul class="list-unstyled mb-0">
+                @foreach (var document in documents.Items)
+                {
+                    <li class="mb-2 d-flex justify-content-between align-items-center">
+                        <span>
+                            <a href="/documents/@document.DocumentId">@document.Title</a>
+                            <br />
+                            <small class="text-muted">
+                                @document.Category &middot; @document.UploadedByUser?.DisplayName
+                                &middot; @document.UploadedDate.ToLocalTime().ToString("d")
+                            </small>
+                        </span>
+                        <a class="btn btn-sm btn-outline-secondary"
+                           href="/api/documents/@document.DocumentId/content?disposition=attachment">
+                            <span class="bi bi-download"></span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int ProjectId { get; set; }
+    [Parameter] public int CurrentUserId { get; set; }
+
+    private DocumentPage? documents;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ProjectId > 0 && CurrentUserId > 0)
+        {
+            documents = await DocumentService.GetProjectDocumentsAsync(
+                ProjectId, CurrentUserId, DocumentQuery.Default);
+        }
+    }
+}
