@@ -356,3 +356,7 @@ MigrationBackup/
 .beads-credential-key
 .beads/proxieddb/
 *.gate.lock*
+
+# SQLite sidecar files
+*.db-shm
+*.db-wal

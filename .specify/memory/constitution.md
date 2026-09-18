@@ -31,10 +31,9 @@ Templates requiring updates:
   - README.md: ✅ no change needed — this amendment only clarifies wording
     (embedded/file-local DB, offline scope, baseline SDK exceptions); it does
     not change what is currently true of the repo, so README's existing
-    "SQL Server LocalDB" and offline-architecture sections remain accurate.
-    When the planned SQLite migration actually lands, README's Database
-    section will need a separate, dedicated update — tracked outside this
-    constitution edit.
+    offline-architecture sections remain accurate. README's Database section
+    still documents SQL Server LocalDB and now needs a separate, dedicated
+    update, because the SQLite migration has since landed (see below).
   - AGENTS.md: ✅ no change needed — does not reference persistence provider,
     offline-runtime scope, or SDK-dependency wording touched by this
     amendment.
@@ -111,11 +110,14 @@ exceptions below and the Non-Negotiable Constraints section).
 constitution; these are not precedent for adding further cloud or network
 dependencies, and MUST NOT be exercised or extended without a constitution
 amendment):
-- `ContosoDashboard.csproj` already references `Microsoft.Identity.Web`
-  2.15.0, `Microsoft.Identity.Web.UI` 2.15.0, and
-  `Microsoft.AspNetCore.Authentication.OpenIdConnect` 8.0.0, and
+- `ContosoDashboard.csproj` already references `Microsoft.Identity.Web`,
+  `Microsoft.Identity.Web.UI`, and
+  `Microsoft.AspNetCore.Authentication.OpenIdConnect`, and
   `appsettings.json` carries a populated (placeholder-valued) `AzureAd`
-  configuration block. These are inert under the mock cookie-based
+  configuration block. The exception covers these three package
+  identities, not any particular version: routine version bumps to stay
+  on a supported, non-vulnerable release are maintenance, not an
+  extension of the exception. These are inert under the mock cookie-based
   authentication actually wired up in `Program.cs`.
 - `Pages/_Host.cshtml` loads Bootstrap CSS/JS and Bootstrap Icons from
   `https://cdn.jsdelivr.net` (whitelisted in the Content-Security-Policy in
