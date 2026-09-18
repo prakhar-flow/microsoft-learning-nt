@@ -1,0 +1,129 @@
+@page "/documents"
+@using ContosoDashboard.Services
+@using ContosoDashboard.Models
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IDocumentService DocumentService
+@inject IProjectService ProjectService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>My Documents - ContosoDashboard</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>My Documents</h1>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary" @onclick="ShowUpload" disabled="@(currentUserId == 0)">
+                <span class="bi bi-upload" aria-hidden="true"></span> Upload Document
+            </button>
+        </div>
+    </div>
+
+    @if (statusMessage != null)
+    {
+        <div class="alert @(statusIsError ? "alert-danger" : "alert-success") alert-dismissible">
+            @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+        </div>
+    }
+
+    @if (documents == null)
+    {
+        <p><em>Loading documents...</em></p>
+    }
+    else if (!documents.Any())
+    {
+        <div class="alert alert-info">
+            You have not uploaded any documents yet. Select <strong>Upload Document</strong> to add one.
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Project</th>
+                        <th>Size</th>
+                        <th>Type</th>
+                        <th>Uploaded</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var document in documents)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@document.Title</strong>
+                                <br />
+                                <small class="text-muted">@document.OriginalFileName</small>
+                            </td>
+                            <td><span class="badge bg-secondary">@document.Category</span></td>
+                            <td>@(document.Project?.Name ?? "-")</td>
+                            <td>@FormatSize(document.FileSizeBytes)</td>
+                            <td><small class="text-muted">@document.ContentType</small></td>
+                            <td>@document.UploadedDate.ToLocalTime().ToString("g")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<DocumentUploadModal @ref="uploadModal"
+                     UserProjects="userProjects"
+                     CurrentUserId="currentUserId"
+                     OnUploadCompleted="HandleUploadCompleted" />
+
+@code {
+    private List<Document>? documents;
+    private List<Project> userProjects = new();
+    private int currentUserId;
+    private string? statusMessage;
+    private bool statusIsError;
+    private DocumentUploadModal? uploadModal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+        {
+            currentUserId = userId;
+            userProjects = await ProjectService.GetUserProjectsAsync(userId);
+            documents = await DocumentService.GetMyDocumentsAsync(userId);
+        }
+        else
+        {
+            documents = new List<Document>();
+        }
+    }
+
+    private void ShowUpload() => uploadModal?.Show();
+
+    private async Task HandleUploadCompleted((bool Succeeded, string Message) result)
+    {
+        statusIsError = !result.Succeeded;
+        statusMessage = result.Message;
+
+        if (result.Succeeded)
+        {
+            documents = await DocumentService.GetMyDocumentsAsync(currentUserId);
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024d:F0} KB";
+        return $"{bytes / 1024d / 1024d:F1} MB";
+    }
+}

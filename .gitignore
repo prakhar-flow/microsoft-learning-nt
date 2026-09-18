@@ -360,3 +360,6 @@ MigrationBackup/
 # SQLite sidecar files
 *.db-shm
 *.db-wal
+
+# Uploaded document content (local storage, never committed)
+ContosoDashboard/Storage/
