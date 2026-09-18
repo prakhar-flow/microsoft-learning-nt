@@ -25,10 +25,10 @@ tests in `ContosoDashboard.Tests/`.
 
 **Purpose**: Groundwork that touches no feature behavior.
 
-- [ ] T001 Create `ContosoDashboard.Tests` xUnit project targeting net9.0, referencing `ContosoDashboard`, with `Microsoft.EntityFrameworkCore.Sqlite` and `Microsoft.EntityFrameworkCore.InMemory`
-- [ ] T002 Add a solution file at the repository root and add both projects to it
-- [ ] T003 [P] Add `ContosoDashboard/Storage/` to `.gitignore` so uploaded files are never committed
-- [ ] T004 [P] Add a `DocumentStorage:RootPath` setting to `appsettings.json` defaulting to `Storage/uploads`, read through `IConfiguration`
+- [x] T001 Create `ContosoDashboard.Tests` xUnit project targeting net9.0, referencing `ContosoDashboard`, with `Microsoft.EntityFrameworkCore.Sqlite` and `Microsoft.EntityFrameworkCore.InMemory`
+- [x] T002 Add a solution file at the repository root and add both projects to it
+- [x] T003 [P] Add `ContosoDashboard/Storage/` to `.gitignore` so uploaded files are never committed
+- [x] T004 [P] Add a `DocumentStorage:RootPath` setting to `appsettings.json` defaulting to `Storage/uploads`, read through `IConfiguration`
 
 **Checkpoint**: `dotnet build` and `dotnet test` both succeed with zero tests.
 
@@ -40,24 +40,24 @@ tests in `ContosoDashboard.Tests/`.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T005 [P] Create `ContosoDashboard/Models/Document.cs` with all 14 properties, data annotations, and navigation properties per data-model.md
-- [ ] T006 [P] Create `ContosoDashboard/Models/DocumentShare.cs` per data-model.md
-- [ ] T007 [P] Create `ContosoDashboard/Models/DocumentActivity.cs` per data-model.md
-- [ ] T008 Append `DocumentShared`, `DocumentAddedToProject`, `DocumentDeleted` to the **end** of the `NotificationType` enum in `ContosoDashboard/Models/Notification.cs` — appending is required because EF persists the enum as an integer
-- [ ] T009 Add `Documents`, `DocumentShares`, `DocumentActivities` collection navigation properties to `Models/User.cs`, and `Documents` to `Models/Project.cs` and `Models/TaskItem.cs`
-- [ ] T010 Add the three `DbSet` properties to `ContosoDashboard/Data/ApplicationDbContext.cs`
-- [ ] T011 Configure relationships in `OnModelCreating`: `Document`→`User` Restrict, `Document`→`Project` **SetNull**, `Document`→`TaskItem` SetNull, `DocumentShare`→`Document` Cascade, `DocumentActivity`→`Document` Cascade. SetNull on `ProjectId` is what implements FR-031b
-- [ ] T012 Configure indexes in `OnModelCreating`: `Document` on `UploadedByUserId`, `ProjectId`, `Category`, `UploadedDate`, and unique on `StoragePath`; `DocumentShare` unique on `(DocumentId, SharedWithUserId)` and on `SharedWithUserId`; `DocumentActivity` on `DocumentId`, `(UserId, OccurredDate)`, `(Action, OccurredDate)`
-- [ ] T013 [P] Create `ContosoDashboard/Services/IFileStorageService.cs` with the four methods from contracts/document-service.md
-- [ ] T014 Implement `ContosoDashboard/Services/LocalFileStorageService.cs` using `System.IO`, resolving the root from configuration, creating directories as needed, and returning the content endpoint path from `GetUrlAsync`
-- [ ] T015 [P] Create `ContosoDashboard/Services/IFileValidationService.cs` and `FileValidationResult`
-- [ ] T016 Implement `ContosoDashboard/Services/FileValidationService.cs`: extension whitelist, MIME check, 25 MB ceiling, zero-length rejection, 255-char filename limit, and leading-byte signature check for PDF, JPEG, PNG, ZIP-based Office formats
-- [ ] T017 Implement storage path generation `{userId}/{projectId|personal}/{guid}.{ext}` — never incorporating the user-supplied filename
-- [ ] T018 Implement tag normalization: split, trim, lowercase, deduplicate, reject more than 10 tags or any tag over 50 characters
-- [ ] T019 Register `IFileStorageService`, `IFileValidationService`, and `IDocumentService` as scoped services in `ContosoDashboard/Program.cs`
-- [ ] T020 [P] Unit-test `FileValidationService` in `ContosoDashboard.Tests/Unit/FileValidationServiceTests.cs`: oversized, zero-byte, disallowed extension, extension/content mismatch, overlong filename, each allowed type
-- [ ] T021 [P] Unit-test path generation in `ContosoDashboard.Tests/Unit/StoragePathTests.cs`, including that a filename containing `../` or a path separator cannot affect the generated path
-- [ ] T022 [P] Unit-test tag normalization in `ContosoDashboard.Tests/Unit/TagNormalizationTests.cs`
+- [x] T005 [P] Create `ContosoDashboard/Models/Document.cs` with all 14 properties, data annotations, and navigation properties per data-model.md
+- [x] T006 [P] Create `ContosoDashboard/Models/DocumentShare.cs` per data-model.md
+- [x] T007 [P] Create `ContosoDashboard/Models/DocumentActivity.cs` per data-model.md
+- [x] T008 Append `DocumentShared`, `DocumentAddedToProject`, `DocumentDeleted` to the **end** of the `NotificationType` enum in `ContosoDashboard/Models/Notification.cs` — appending is required because EF persists the enum as an integer
+- [x] T009 Add `Documents`, `DocumentShares`, `DocumentActivities` collection navigation properties to `Models/User.cs`, and `Documents` to `Models/Project.cs` and `Models/TaskItem.cs`
+- [x] T010 Add the three `DbSet` properties to `ContosoDashboard/Data/ApplicationDbContext.cs`
+- [x] T011 Configure relationships in `OnModelCreating`: `Document`→`User` Restrict, `Document`→`Project` **SetNull**, `Document`→`TaskItem` SetNull, `DocumentShare`→`Document` Cascade, `DocumentActivity`→`Document` Cascade. SetNull on `ProjectId` is what implements FR-031b
+- [x] T012 Configure indexes in `OnModelCreating`: `Document` on `UploadedByUserId`, `ProjectId`, `Category`, `UploadedDate`, and unique on `StoragePath`; `DocumentShare` unique on `(DocumentId, SharedWithUserId)` and on `SharedWithUserId`; `DocumentActivity` on `DocumentId`, `(UserId, OccurredDate)`, `(Action, OccurredDate)`
+- [x] T013 [P] Create `ContosoDashboard/Services/IFileStorageService.cs` with the four methods from contracts/document-service.md
+- [x] T014 Implement `ContosoDashboard/Services/LocalFileStorageService.cs` using `System.IO`, resolving the root from configuration, creating directories as needed, and returning the content endpoint path from `GetUrlAsync`
+- [x] T015 [P] Create `ContosoDashboard/Services/IFileValidationService.cs` and `FileValidationResult`
+- [x] T016 Implement `ContosoDashboard/Services/FileValidationService.cs`: extension whitelist, MIME check, 25 MB ceiling, zero-length rejection, 255-char filename limit, and leading-byte signature check for PDF, JPEG, PNG, ZIP-based Office formats
+- [x] T017 Implement storage path generation `{userId}/{projectId|personal}/{guid}.{ext}` — never incorporating the user-supplied filename
+- [x] T018 Implement tag normalization: split, trim, lowercase, deduplicate, reject more than 10 tags or any tag over 50 characters
+- [x] T019 Register `IFileStorageService`, `IFileValidationService`, and `IDocumentService` as scoped services in `ContosoDashboard/Program.cs`
+- [x] T020 [P] Unit-test `FileValidationService` in `ContosoDashboard.Tests/Unit/FileValidationServiceTests.cs`: oversized, zero-byte, disallowed extension, extension/content mismatch, overlong filename, each allowed type
+- [x] T021 [P] Unit-test path generation in `ContosoDashboard.Tests/Unit/StoragePathTests.cs`, including that a filename containing `../` or a path separator cannot affect the generated path
+- [x] T022 [P] Unit-test tag normalization in `ContosoDashboard.Tests/Unit/TagNormalizationTests.cs`
 
 **Checkpoint**: schema creates cleanly on a fresh database; validation, path, and tag logic are covered by passing tests.
 
@@ -71,25 +71,25 @@ tests in `ContosoDashboard.Tests/`.
 
 ### Tests for User Story 1
 
-- [ ] T023 [P] [US1] Integration test in `ContosoDashboard.Tests/Integration/DocumentUploadTests.cs`: a valid upload creates exactly one row and one file
-- [ ] T024 [P] [US1] Integration test: upload rejected for oversized, disallowed-type, zero-byte, and missing-required-field inputs, with no row and no file left behind
-- [ ] T025 [P] [US1] Integration test in `DocumentUploadCompensationTests.cs`: when the metadata write fails, the written file is removed and no row survives
-- [ ] T026 [P] [US1] Integration test: associating a document with a project the user does not belong to is rejected
+- [x] T023 [P] [US1] Integration test in `ContosoDashboard.Tests/Integration/DocumentUploadTests.cs`: a valid upload creates exactly one row and one file
+- [x] T024 [P] [US1] Integration test: upload rejected for oversized, disallowed-type, zero-byte, and missing-required-field inputs, with no row and no file left behind
+- [x] T025 [P] [US1] Integration test in `DocumentUploadCompensationTests.cs`: when the metadata write fails, the written file is removed and no row survives
+- [x] T026 [P] [US1] Integration test: associating a document with a project the user does not belong to is rejected
 
 ### Implementation for User Story 1
 
-- [ ] T027 [US1] Create `ContosoDashboard/Services/IDocumentService.cs` with the full method surface from contracts/document-service.md
-- [ ] T028 [US1] Implement `DocumentService.UploadAsync` in `ContosoDashboard/Services/DocumentService.cs` following the R3 ordering — validate, authorize project membership, generate path, write file, persist row — with file cleanup if the row cannot be saved
-- [ ] T029 [US1] Implement `DocumentService.GetMyDocumentsAsync` returning the acting user's documents, composed as `IQueryable` and executed once
-- [ ] T030 [US1] Implement `DocumentService.GetCountAsync`
-- [ ] T031 [US1] Write `ContosoDashboard/Pages/Documents.razor` with `@attribute [Authorize]`, `@page "/documents"`, and a table of the user's documents showing title, category, upload date, file size, and project
-- [ ] T032 [US1] Write `ContosoDashboard/Shared/DocumentUploadModal.razor` using `InputFile` with a `@key` that changes after each upload; read `Name`, `Size`, `ContentType` into locals before opening the stream; pass the 25 MB cap to `OpenReadStream`; copy to `MemoryStream`; null the `IBrowserFile` and call `StateHasChanged`
-- [ ] T033 [US1] Add the metadata form to the modal: required title, required category from the six permitted values, optional description, optional project restricted to the user's projects, optional tags
-- [ ] T034 [US1] Add an upload progress indicator and explicit success and error messages
-- [ ] T035 [US1] Add client-side size and type pre-checks that mirror — and never replace — the server-side validation
-- [ ] T036 [US1] Add a **Documents** entry to `ContosoDashboard/Shared/NavMenu.razor`
-- [ ] T037 [US1] Write a `DocumentActivity` of `Upload` on every successful upload
-- [ ] T038 [US1] Notify project members when a document is uploaded to their project, using the appended `DocumentAddedToProject` notification type
+- [x] T027 [US1] Create `ContosoDashboard/Services/IDocumentService.cs` with the full method surface from contracts/document-service.md
+- [x] T028 [US1] Implement `DocumentService.UploadAsync` in `ContosoDashboard/Services/DocumentService.cs` following the R3 ordering — validate, authorize project membership, generate path, write file, persist row — with file cleanup if the row cannot be saved
+- [x] T029 [US1] Implement `DocumentService.GetMyDocumentsAsync` returning the acting user's documents, composed as `IQueryable` and executed once
+- [x] T030 [US1] Implement `DocumentService.GetCountAsync`
+- [x] T031 [US1] Write `ContosoDashboard/Pages/Documents.razor` with `@attribute [Authorize]`, `@page "/documents"`, and a table of the user's documents showing title, category, upload date, file size, and project
+- [x] T032 [US1] Write `ContosoDashboard/Shared/DocumentUploadModal.razor` using `InputFile` with a `@key` that changes after each upload; read `Name`, `Size`, `ContentType` into locals before opening the stream; pass the 25 MB cap to `OpenReadStream`; copy to `MemoryStream`; null the `IBrowserFile` and call `StateHasChanged`
+- [x] T033 [US1] Add the metadata form to the modal: required title, required category from the six permitted values, optional description, optional project restricted to the user's projects, optional tags
+- [x] T034 [US1] Add an upload progress indicator and explicit success and error messages
+- [x] T035 [US1] Add client-side size and type pre-checks that mirror — and never replace — the server-side validation
+- [x] T036 [US1] Add a **Documents** entry to `ContosoDashboard/Shared/NavMenu.razor`
+- [x] T037 [US1] Write a `DocumentActivity` of `Upload` on every successful upload
+- [x] T038 [US1] Notify project members when a document is uploaded to their project, using the appended `DocumentAddedToProject` notification type
 
 **Checkpoint**: 🎯 **MVP complete and demonstrable.** Upload works end to end; the MVP acceptance scenarios in spec.md US1 can be walked through by hand.
 
@@ -217,7 +217,12 @@ without **[P]** touch a file another task in the same phase also touches — chi
 
 ## Implementation Strategy
 
-### MVP first (recommended)
+### MVP first (recommended) — ✅ COMPLETE
+
+**Status**: T001–T038 implemented and verified on 2026-09-18. `dotnet build` reports 0
+errors; `dotnet test` reports 22 passing. The application creates all three tables on SQLite
+and serves `/documents` to an authenticated employee. Remaining phases are unstarted.
+
 
 Implement **T001 – T038**: Setup, Foundational, and User Story 1. That range delivers a
 working, demonstrable upload feature — an employee can upload a document with metadata and
